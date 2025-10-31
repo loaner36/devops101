@@ -1,0 +1,45 @@
+name: Build & Release
+
+on:
+  workflow_dispatch:                        # 手动触发按钮
+  push:
+    tags: ['v*']                            # 推送 v* 标签自动触发
+
+permissions:                                # GITHUB_TOKEN 权限
+  contents: write                           # 允许创建/更新 Release、上传资产
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install zip
+        run: sudo apt-get update && sudo apt-get install -y zip
+
+      - name: Build release zip
+        run: |
+          chmod +x tools/make-release-zip.sh
+          ./tools/make-release-zip.sh
+
+      - name: Find package
+        id: pkg
+        run: echo "PKG=$(ls -1 sysdiag_release_*.zip)" >> $GITHUB_OUTPUT
+
+      - name: Compute tag
+        id: tag
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT   # 使用当前 tag
+          else
+            echo "TAG=v0.0.${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT  # 手动触发时生成默认 tag
+          fi
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.tag.outputs.TAG }}
+          artifacts: ${{ steps.pkg.outputs.PKG }}
+          generateReleaseNotes: true
+          allowUpdates: true
