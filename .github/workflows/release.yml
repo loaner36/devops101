@@ -1,0 +1,52 @@
+
+name: Build & Release
+
+on:
+  workflow_dispatch:           # 🧠 手动触发按钮（Actions → Run workflow）
+  push:
+    tags: ['v*']               # 🧠 推送 v* 标签自动触发
+
+permissions:                   # 🧠 顶格：给 GITHUB_TOKEN 写 Release 的权限
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install zip
+        run: sudo apt-get update && sudo apt-get install -y zip
+
+      - name: Build release zip
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          TS="$(date +%Y%m%d_%H%M%S)"
+          PKG="sysdiag_release_${TS}.zip"
+          FILES=()
+          [[ -f "sysdiag.sh" ]] && FILES+=("sysdiag.sh")
+          [[ -f "pack_sysdiag.sh" ]] && FILES+=("pack_sysdiag.sh")
+          [[ -f "README.md" ]] && FILES+=("README.md")
+          if [[ ${#FILES[@]} -eq 0 ]]; then echo "没有可打包的文件"; exit 1; fi
+          zip -9 -r "$PKG" "${FILES[@]}"
+          echo "PKG=$PKG" >> "$GITHUB_OUTPUT"
+
+      - name: Compute tag
+        id: tag
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "TAG=v0.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.tag.outputs.TAG }}
+          artifacts: ${{ steps.build.outputs.PKG }}
+          generateReleaseNotes: true
+          allowUpdates: true
