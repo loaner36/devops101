@@ -1,0 +1,11 @@
+# 诊断产物
+sysdiag_*.txt
+sysdiag_bundle_*.tar.gz
+win_sysdiag_*.txt
+win_sysdiag_bundle_*.zip
+
+# 常见临时
+.DS_Store
+Thumbs.db
+node_modules/
+*.log
